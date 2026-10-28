@@ -1,0 +1,49 @@
+{
+  "cases": {
+    "assets": {
+      "image_byte_update_synced": true,
+      "local_pdf_uploaded_once": true,
+      "pdf_downloads": 0,
+      "repeat_writes": 0
+    },
+    "both": {
+      "conflict_preserved": true,
+      "independent_notes_synced": true,
+      "repeat_writes": 0,
+      "shared_matched": 1
+    },
+    "cloud": {
+      "incremental_pull": true,
+      "native_table_linked": true,
+      "note_pulled": true
+    },
+    "guarded_writes": {
+      "ancestry_checked_for_mutations": true,
+      "repeat_writes": 0
+    },
+    "keep_both_resolution": {
+      "baselines_not_reset": true,
+      "both_versions_preserved": true,
+      "repeat_writes": 0
+    },
+    "large_note": {
+      "ordered_bounded_patches": true,
+      "paragraphs": 130,
+      "repeat_writes": 0
+    },
+    "local": {
+      "created": 2,
+      "cyclic_links_resolved": true,
+      "repeat_writes": 0
+    },
+    "native_cloud_image": {
+      "cloud_image_bytes_preserved": true,
+      "generic_attachment_directory": true,
+      "repeat_writes": 0,
+      "subsequent_local_edit_synced": true
+    }
+  },
+  "llm_calls": 0,
+  "notes_and_ids_in_output_only": true,
+  "status": "passed"
+}

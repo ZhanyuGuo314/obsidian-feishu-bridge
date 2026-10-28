@@ -1,0 +1,8 @@
+include README.md README.en.md README.zh-CN.md LICENSE SECURITY.md CONTRIBUTING.md .gitignore .gitattributes
+recursive-include docs *.md *.json
+recursive-include scripts *.py
+recursive-include skills *.md *.yaml
+recursive-include tests *.py
+recursive-include .github *.yml
+recursive-include examples *.json
+global-exclude *.pyc *.sqlite *.sqlite-* *.db *.exe *.pdf *.png *.log

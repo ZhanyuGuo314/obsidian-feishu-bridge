@@ -1,0 +1,107 @@
+name: Build and publish alpha
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: alpha-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - name: Require successful main CI for this commit
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&event=push&per_page=100" > "$RUNNER_TEMP/ci-runs.json"
+          python - <<'PY'
+          import json, os, pathlib, tomllib
+          version = tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version']
+          assert os.environ['RELEASE_TAG'] == 'v' + version, 'Tag must match package version'
+          runs = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'ci-runs.json').read_text())['workflow_runs']
+          candidates = [r for r in runs if r['path'] == '.github/workflows/ci.yml' and r['head_branch'] == 'main' and r['head_sha'] == os.environ['GITHUB_SHA']]
+          assert candidates, 'No main CI run for this commit'
+          latest = max(candidates, key=lambda r: r['id'])
+          assert latest['status'] == 'completed' and latest['conclusion'] == 'success', 'Main CI must pass before release'
+          PY
+      - run: python -m pip install '.[dev]'
+      - run: python scripts/check_public.py
+      - run: python scripts/sync_skill.py --check
+      - run: python -m build
+      - name: Prepare and scan release assets
+        shell: python
+        run: |
+          import hashlib, os, pathlib, subprocess, sys, tomllib
+          version = tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version']
+          from obsidian_feishu_bridge import __version__
+          assert __version__ == version
+          dist = pathlib.Path('dist')
+          source = dist / f'obsidian-feishu-bridge-{version}-source.zip'
+          subprocess.run(['git', 'archive', '--format=zip', f'--prefix=obsidian-feishu-bridge-{version}/', '--output', str(source), 'HEAD'], check=True)
+          assets = sorted(dist.iterdir())
+          assert len(assets) == 3, 'Expected wheel, source archive and source ZIP'
+          for path in assets:
+              subprocess.run([sys.executable, 'scripts/check_public.py', '--archive', str(path)], check=True)
+          (dist / 'SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest() + '  ' + p.name + '\n' for p in assets))
+          repo = os.environ['GITHUB_REPOSITORY']
+          tag = os.environ['RELEASE_TAG']
+          body = pathlib.Path(f'docs/release-{version}.md').read_text()
+          body = body.replace('(validation.md)', f'(https://github.com/{repo}/blob/{tag}/docs/validation.md)')
+          body += '\n<!-- ofb-release-workflow:' + os.environ['GITHUB_SHA'] + ' -->\n'
+          (pathlib.Path(os.environ['RUNNER_TEMP']) / 'release-body.md').write_text(body)
+      - name: Verify isolated wheel installation
+        shell: python
+        run: |
+          import json, os, pathlib, subprocess, venv
+          work = pathlib.Path(os.environ['RUNNER_TEMP']) / 'ofb-cold-install'
+          venv.EnvBuilder(with_pip=True).create(work / 'venv')
+          executable = work / 'venv/bin/python'
+          wheel = next(pathlib.Path('dist').glob('*.whl')).resolve()
+          subprocess.run([str(executable), '-m', 'pip', 'install', str(wheel)], check=True)
+          subprocess.run([str(executable), '-I', '-c', 'import obsidian_feishu_bridge; assert "site-packages" in obsidian_feishu_bridge.__file__'], cwd=work, check=True)
+          subprocess.run([str(executable), '-I', '-m', 'obsidian_feishu_bridge', '--help'], cwd=work, check=True)
+          subprocess.run([str(executable), '-I', '-m', 'obsidian_feishu_bridge', 'install-skill', '--output', str(work / 'skill')], cwd=work, check=True)
+          process = subprocess.run([str(executable), '-I', '-m', 'obsidian_feishu_bridge', '--data-home', str(work / 'profiles-home'), 'profiles'], cwd=work, capture_output=True, text=True, check=True)
+          assert json.loads(process.stdout)['profiles'] == []
+          assert (work / 'skill/references/auth.md').is_file()
+          assert (work / 'skill/references/policies.md').is_file()
+      - name: Create draft, upload, verify and publish
+        shell: python
+        run: |
+          import hashlib, json, os, pathlib, subprocess
+          tag = os.environ['RELEASE_TAG']
+          marker = '<!-- ofb-release-workflow:' + os.environ['GITHUB_SHA'] + ' -->'
+          body = pathlib.Path(os.environ['RUNNER_TEMP']) / 'release-body.md'
+          existing = subprocess.run(['gh', 'release', 'view', tag, '--json', 'isDraft,body'], capture_output=True, text=True)
+          if existing.returncode == 0:
+              info = json.loads(existing.stdout)
+              assert info['isDraft'] and marker in info['body'], 'Refuse to replace an unrelated or already published release'
+          else:
+              assert 'not found' in existing.stderr.lower() or '404' in existing.stderr, existing.stderr
+              subprocess.run(['gh', 'release', 'create', tag, '--draft', '--prerelease', '--verify-tag', '--title', tag + ' alpha', '--notes-file', str(body)], check=True)
+          dist = pathlib.Path('dist')
+          assets = sorted(dist.iterdir())
+          subprocess.run(['gh', 'release', 'upload', tag, *[str(p) for p in assets], '--clobber'], check=True)
+          readback = pathlib.Path(os.environ['RUNNER_TEMP']) / 'release-readback'
+          readback.mkdir()
+          subprocess.run(['gh', 'release', 'download', tag, '--dir', str(readback)], check=True)
+          for path in assets:
+              assert hashlib.sha256(path.read_bytes()).digest() == hashlib.sha256((readback / path.name).read_bytes()).digest(), path.name
+          subprocess.run(['gh', 'release', 'edit', tag, '--draft=false', '--prerelease'], check=True)

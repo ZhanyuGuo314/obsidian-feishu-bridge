@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "obsidian-feishu-bridge"
+version = "0.1.0"
+description = "An agent-guided, stateful bridge between Obsidian and Feishu Wiki"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{name = "obsidian-feishu-bridge contributors"}]
+dependencies = ["markdown-it-py>=3,<5", "mdit-py-plugins>=0.4,<0.7"]
+
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Topic :: Office/Business",
+]
+
+[project.optional-dependencies]
+dev = ["build>=1.2,<2", "ruff==0.17.3"]
+
+[project.urls]
+Source = "https://github.com/ZhanyuGuo314/obsidian-feishu-bridge"
+Issues = "https://github.com/ZhanyuGuo314/obsidian-feishu-bridge/issues"
+
+[project.scripts]
+ofb = "obsidian_feishu_bridge.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+obsidian_feishu_bridge = ["skilldata/*.md", "skilldata/references/*.md"]
+
+[tool.ruff]
+line-length = 100

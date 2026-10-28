@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "vault_root": "/path/to/your/vault",
+  "cli_path": "/path/to/lark-cli",
+  "identity": "user",
+  "mappings": [
+    {
+      "local_prefix": "Notes",
+      "space_id": "SPACE_ID",
+      "root_node": "ROOT_NODE_TOKEN"
+    }
+  ],
+  "bootstrap_mode": "both",
+  "resources": {
+    "images": "embed",
+    "pdf": "link",
+    "file": "link",
+    "sheet": "link",
+    "bitable": "link",
+    "whiteboard": "link",
+    "unknown": "pause"
+  },
+  "local_files": "referenced",
+  "identity_field": "ofb_id",
+  "path_layout": "document_tree",
+  "conflict_policy": "pause_preserve_both",
+  "production_writes_enabled": false,
+  "llm_enabled": false,
+  "state_db": "state/sync.sqlite",
+  "timeout_seconds": 90,
+  "sweep_seconds": 86400,
+  "discovery_seconds": 3600,
+  "exclude": [".obsidian", ".trash", ".git", ".ofb", ".obsidian-feishu-bridge"]
+}
